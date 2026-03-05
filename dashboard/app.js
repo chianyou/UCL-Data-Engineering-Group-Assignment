@@ -1,4 +1,5 @@
-const DATA_BASE = "../data/curated/transformation_summaries";
+const CSV_BASE = "../data/curated/transformation_summaries";
+const API_BASE = new URLSearchParams(window.location.search).get("api_base") || "";
 const COLORS = {
   green: "#1f6b52",
   moss: "#507f62",
@@ -8,8 +9,24 @@ const COLORS = {
   red: "#a6403b",
 };
 
+const CSV_FILE_MAP = {
+  daily: "fact_daily_new_cves_latest.csv",
+  cvss: "agg_cvss_severity_distribution_latest.csv",
+  kev: "agg_kev_hit_rate_by_cvss_severity_latest.csv",
+  epss: "agg_epss_high_risk_by_vendor_product_latest.csv",
+  cwe: "agg_cwe_vendor_product_latest.csv",
+};
+
+const API_PATH_MAP = {
+  daily: "/api/agg/daily-new-cves",
+  cvss: "/api/agg/cvss-severity-distribution",
+  kev: "/api/agg/kev-hit-rate",
+  epss: "/api/agg/epss-vendor-product",
+  cwe: "/api/agg/cwe-vendor-product",
+};
+
 async function fetchCsvRows(fileName) {
-  const response = await fetch(`${DATA_BASE}/${fileName}`);
+  const response = await fetch(`${CSV_BASE}/${fileName}`);
   if (!response.ok) {
     throw new Error(`Failed to load ${fileName}: ${response.status}`);
   }
@@ -22,6 +39,22 @@ async function fetchCsvRows(fileName) {
       const values = splitCsvLine(line);
       return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
     });
+}
+
+async function fetchApiRows(path) {
+  const base = API_BASE.replace(/\/$/, "");
+  const response = await fetch(`${base}${path}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load API ${path}: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function fetchRows(key) {
+  if (API_BASE) {
+    return fetchApiRows(API_PATH_MAP[key]);
+  }
+  return fetchCsvRows(CSV_FILE_MAP[key]);
 }
 
 function splitCsvLine(line) {
@@ -289,11 +322,11 @@ function baseLayout(title) {
 async function bootstrap() {
   try {
     const [dailyRows, cvssRows, kevRows, epssRows, cweRows] = await Promise.all([
-      fetchCsvRows("fact_daily_new_cves_latest.csv"),
-      fetchCsvRows("agg_cvss_severity_distribution_latest.csv"),
-      fetchCsvRows("agg_kev_hit_rate_by_cvss_severity_latest.csv"),
-      fetchCsvRows("agg_epss_high_risk_by_vendor_product_latest.csv"),
-      fetchCsvRows("agg_cwe_vendor_product_latest.csv"),
+      fetchRows("daily"),
+      fetchRows("cvss"),
+      fetchRows("kev"),
+      fetchRows("epss"),
+      fetchRows("cwe"),
     ]);
 
     buildHeroStats(dailyRows, kevRows, epssRows);
