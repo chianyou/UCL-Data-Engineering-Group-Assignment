@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +48,30 @@ def parse_origins() -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def autoload_duckdb_enabled() -> bool:
+    return os.getenv("AUTOLOAD_DUCKDB", "1").strip().lower() not in {"0", "false", "no"}
+
+
+def ensure_duckdb_ready() -> None:
+    db_path = get_db_path()
+    if db_path.exists():
+        return
+    if not autoload_duckdb_enabled():
+        return
+
+    loader_script = REPO_ROOT / "src" / "analytics" / "duckdb" / "load_duckdb.py"
+    cmd = [sys.executable, str(loader_script), "--db-path", str(db_path)]
+    curated_dir = os.getenv("CURATED_DIR", "").strip()
+    if curated_dir:
+        cmd.extend(["--curated-dir", curated_dir])
+
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise RuntimeError(f"Failed to initialize DuckDB at startup: {detail}") from exc
+
+
 app = FastAPI(
     title="Cyber Risk Analytics API",
     version="1.0.0",
@@ -60,6 +86,11 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def startup_init() -> None:
+    ensure_duckdb_ready()
 
 
 @app.get("/health")
@@ -131,4 +162,3 @@ def cwe_vendor_product(limit: int = Query(default=500, ge=1, le=5000)) -> list[d
         """,
         [limit],
     )
-

@@ -144,6 +144,27 @@ Open:
 - API health: `http://127.0.0.1:8001/health`
 - API docs: `http://127.0.0.1:8001/docs`
 
+## Deploy API on Render
+
+This repo includes `render.yaml` for Blueprint deployment.
+
+1. Push current branch to GitHub.
+2. In Render, create a new Blueprint and select this repository.
+3. Deploy the `cyber-risk-api` web service.
+4. After deploy, open:
+   - `https://<your-render-domain>/health`
+   - `https://<your-render-domain>/docs`
+5. Point dashboard API mode to Render:
+   - `...?api_base=https://<your-render-domain>`
+
+Recommended Render environment variables:
+- `ALLOWED_ORIGINS=https://<your-github-pages-domain>`
+- `AUTOLOAD_DUCKDB=1`
+
+Notes:
+- On free plans, filesystem persistence is limited; DuckDB may be rebuilt on restart.
+- Startup auto-load uses `src/analytics/duckdb/load_duckdb.py` when DB file is missing.
+
 ## Current Progress
 
 - Step 1 (Data Integration Owner): completed
