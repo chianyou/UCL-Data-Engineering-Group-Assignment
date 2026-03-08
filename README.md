@@ -195,6 +195,8 @@ Job-level lineage tracking is enabled for key transformation and analytics scrip
 Lineage outputs:
 - `data/curated/lineage/lineage_events_latest.csv`
 - `data/curated/lineage/lineage_events_latest.jsonl`
+- `data/curated/lineage/lineage_events_sample.csv` (lightweight sample for repository sharing)
+- `data/curated/lineage/lineage_events_sample.jsonl` (lightweight sample for repository sharing)
 
 Tracked jobs:
 - `build_vulnerability_mart`
@@ -206,6 +208,10 @@ Tracked jobs:
 
 Detailed field definitions and query examples:
 - `docs/lineage.md`
+
+Repository note:
+- Full lineage logs can become very large due to embedded dataset metadata.
+- GitHub file size limit is 100 MB per file, so this repository shares sample lineage files and keeps full logs local.
 
 ## Notes
 
