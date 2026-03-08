@@ -5,14 +5,18 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
+
+from src.lineage.lineage_logger import log_lineage_event
 HIGH_EPSS_THRESHOLD = 0.7
 
 
@@ -225,37 +229,71 @@ def main() -> int:
     data_dir = Path(args.data_dir)
     mart_path = data_dir / "curated" / "vulnerability_priority" / "vulnerability_priority_latest.csv"
     bridge_path = data_dir / "curated" / "product_impact" / "bridge_cve_products_latest.csv"
-    mart_rows = read_csv(mart_path)
-    bridge_rows = read_csv(bridge_path) if bridge_path.exists() else []
-    bridge_enriched_rows = build_bridge_enriched_rows(mart_rows, bridge_rows)
 
     summary_dir = data_dir / "curated" / "transformation_summaries"
     summary_dir.mkdir(parents=True, exist_ok=True)
 
-    outputs = {
-        "fact_daily_new_cves_latest": build_daily_new_cves(mart_rows),
-        "agg_cvss_severity_distribution_latest": build_cvss_distribution(mart_rows),
-        "agg_kev_hit_rate_by_cvss_severity_latest": build_kev_hit_rate(mart_rows),
-        "agg_epss_high_risk_by_vendor_product_latest": build_epss_high_risk_distribution(
-            bridge_enriched_rows
-        ),
-        "agg_cwe_vendor_product_latest": build_cwe_vendor_product_aggregation(bridge_enriched_rows),
-    }
+    input_paths = [mart_path, bridge_path]
+    output_paths: list[Path] = []
+    output_row_count = 0
 
-    parquet_written = True
-    for name, rows in outputs.items():
-        csv_path = summary_dir / f"{name}.csv"
-        parquet_path = summary_dir / f"{name}.parquet"
-        write_csv(csv_path, rows)
-        parquet_written = write_parquet_if_available(parquet_path, rows) and parquet_written
-        print(f"Built {name}: {len(rows)} rows")
-        print(f"CSV: {csv_path}")
+    try:
+        mart_rows = read_csv(mart_path)
+        bridge_rows = read_csv(bridge_path) if bridge_path.exists() else []
+        bridge_enriched_rows = build_bridge_enriched_rows(mart_rows, bridge_rows)
 
-    if parquet_written:
-        print("Parquet outputs created for all transformation summary datasets")
-    else:
-        print("Parquet skipped for one or more summary datasets: pyarrow not installed")
-    return 0
+        outputs = {
+            "fact_daily_new_cves_latest": build_daily_new_cves(mart_rows),
+            "agg_cvss_severity_distribution_latest": build_cvss_distribution(mart_rows),
+            "agg_kev_hit_rate_by_cvss_severity_latest": build_kev_hit_rate(mart_rows),
+            "agg_epss_high_risk_by_vendor_product_latest": build_epss_high_risk_distribution(
+                bridge_enriched_rows
+            ),
+            "agg_cwe_vendor_product_latest": build_cwe_vendor_product_aggregation(bridge_enriched_rows),
+        }
+
+        parquet_written = True
+        for name, rows in outputs.items():
+            csv_path = summary_dir / f"{name}.csv"
+            parquet_path = summary_dir / f"{name}.parquet"
+            output_paths.extend([csv_path, parquet_path])
+            write_csv(csv_path, rows)
+            parquet_written = write_parquet_if_available(parquet_path, rows) and parquet_written
+            output_row_count += len(rows)
+            print(f"Built {name}: {len(rows)} rows")
+            print(f"CSV: {csv_path}")
+
+        if parquet_written:
+            print("Parquet outputs created for all transformation summary datasets")
+        else:
+            print("Parquet skipped for one or more summary datasets: pyarrow not installed")
+
+        log_lineage_event(
+            data_dir=data_dir,
+            job_name="build_transformation_summaries",
+            layer="curated",
+            code_path=Path(__file__),
+            transform_summary="Build analytics summary aggregates for trend, severity, KEV, EPSS, and CWE views.",
+            input_paths=input_paths,
+            output_paths=output_paths,
+            status="success",
+            input_count=len(mart_rows),
+            output_count=output_row_count,
+        )
+        return 0
+    except Exception as exc:
+        log_lineage_event(
+            data_dir=data_dir,
+            job_name="build_transformation_summaries",
+            layer="curated",
+            code_path=Path(__file__),
+            transform_summary="Build analytics summary aggregates for trend, severity, KEV, EPSS, and CWE views.",
+            input_paths=input_paths,
+            output_paths=output_paths,
+            status="failed",
+            error_message=str(exc),
+        )
+        raise
 
 
 if __name__ == "__main__":

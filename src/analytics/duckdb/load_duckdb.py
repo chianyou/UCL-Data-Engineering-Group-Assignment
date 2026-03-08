@@ -4,14 +4,18 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import duckdb
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "analytics.duckdb"
 DEFAULT_DATA_DIR = REPO_ROOT / "data" / "curated"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
+
+from src.lineage.lineage_logger import log_lineage_event
 
 
 def parse_args() -> argparse.Namespace:
@@ -79,21 +83,63 @@ def main() -> int:
         / "agg_cwe_vendor_product_latest.parquet",
     }
 
-    missing = [name for name, path in table_map.items() if not path.exists()]
-    if missing:
-        print("Missing input parquet files for tables:")
-        for name in missing:
-            print(f"- {name}: {table_map[name]}")
-        return 1
+    input_paths = list(table_map.values())
+    output_paths = [db_path]
+    output_count = 0
 
-    with duckdb.connect(str(db_path)) as con:
-        for table_name, parquet_path in table_map.items():
-            create_table_from_parquet(con, table_name, parquet_path)
-            count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-            print(f"Loaded {table_name}: {count} rows")
+    try:
+        missing = [name for name, path in table_map.items() if not path.exists()]
+        if missing:
+            print("Missing input parquet files for tables:")
+            for name in missing:
+                print(f"- {name}: {table_map[name]}")
+            log_lineage_event(
+                data_dir=curated_dir.parent,
+                job_name="load_duckdb_tables",
+                layer="analytics",
+                code_path=Path(__file__),
+                transform_summary="Load curated parquet datasets into DuckDB analytics tables.",
+                input_paths=input_paths,
+                output_paths=output_paths,
+                status="failed",
+                error_message=f"Missing parquet inputs for {len(missing)} tables",
+            )
+            return 1
 
-    print(f"DuckDB database ready: {db_path.resolve()}")
-    return 0
+        with duckdb.connect(str(db_path)) as con:
+            for table_name, parquet_path in table_map.items():
+                create_table_from_parquet(con, table_name, parquet_path)
+                count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                output_count += int(count)
+                print(f"Loaded {table_name}: {count} rows")
+
+        print(f"DuckDB database ready: {db_path.resolve()}")
+        log_lineage_event(
+            data_dir=curated_dir.parent,
+            job_name="load_duckdb_tables",
+            layer="analytics",
+            code_path=Path(__file__),
+            transform_summary="Load curated parquet datasets into DuckDB analytics tables.",
+            input_paths=input_paths,
+            output_paths=output_paths,
+            status="success",
+            input_count=len(input_paths),
+            output_count=output_count,
+        )
+        return 0
+    except Exception as exc:
+        log_lineage_event(
+            data_dir=curated_dir.parent,
+            job_name="load_duckdb_tables",
+            layer="analytics",
+            code_path=Path(__file__),
+            transform_summary="Load curated parquet datasets into DuckDB analytics tables.",
+            input_paths=input_paths,
+            output_paths=output_paths,
+            status="failed",
+            error_message=str(exc),
+        )
+        raise
 
 
 if __name__ == "__main__":

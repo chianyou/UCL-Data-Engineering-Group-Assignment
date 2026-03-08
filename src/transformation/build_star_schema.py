@@ -5,13 +5,17 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
+
+from src.lineage.lineage_logger import log_lineage_event
 
 
 PRIORITY_DIMENSIONS = [
@@ -243,22 +247,6 @@ def main() -> int:
         data_dir / "curated" / "cve_records" / "bridge_cve_problem_types_latest.csv"
     )
 
-    vulnerability_rows = read_csv(vulnerability_path)
-    bridge_rows = read_csv(bridge_path) if bridge_path.exists() else []
-    problem_type_rows = read_csv(problem_types_path) if problem_types_path.exists() else []
-    product_counts = build_product_counts(bridge_rows)
-    dim_priority_rows = build_dim_priority()
-    dim_severity_rows = build_dim_severity()
-    dim_cwe_rows = build_dim_cwe(vulnerability_rows, problem_type_rows)
-
-    fact_rows, dates = build_fact_rows(
-        vulnerability_rows,
-        product_counts,
-        build_priority_lookup(dim_priority_rows),
-        build_severity_lookup(dim_severity_rows),
-    )
-    dim_date_rows = build_dim_date(dates)
-
     curated_dir = data_dir / "curated" / "star_schema"
     curated_dir.mkdir(parents=True, exist_ok=True)
 
@@ -267,40 +255,96 @@ def main() -> int:
     dim_severity_csv = curated_dir / "dim_severity_latest.csv"
     dim_cwe_csv = curated_dir / "dim_cwe_latest.csv"
     fact_csv = curated_dir / "fact_vulnerability_risk_latest.csv"
+    input_paths = [vulnerability_path, bridge_path, problem_types_path]
+    output_paths = [
+        dim_date_csv,
+        dim_priority_csv,
+        dim_severity_csv,
+        dim_cwe_csv,
+        fact_csv,
+        curated_dir / "dim_date_latest.parquet",
+        curated_dir / "dim_priority_latest.parquet",
+        curated_dir / "dim_severity_latest.parquet",
+        curated_dir / "dim_cwe_latest.parquet",
+        curated_dir / "fact_vulnerability_risk_latest.parquet",
+    ]
 
-    write_csv(dim_date_csv, dim_date_rows)
-    write_csv(dim_priority_csv, dim_priority_rows)
-    write_csv(dim_severity_csv, dim_severity_rows)
-    write_csv(dim_cwe_csv, dim_cwe_rows)
-    write_csv(fact_csv, fact_rows)
+    try:
+        vulnerability_rows = read_csv(vulnerability_path)
+        bridge_rows = read_csv(bridge_path) if bridge_path.exists() else []
+        problem_type_rows = read_csv(problem_types_path) if problem_types_path.exists() else []
+        product_counts = build_product_counts(bridge_rows)
+        dim_priority_rows = build_dim_priority()
+        dim_severity_rows = build_dim_severity()
+        dim_cwe_rows = build_dim_cwe(vulnerability_rows, problem_type_rows)
 
-    dim_date_parquet = write_parquet_if_available(curated_dir / "dim_date_latest.parquet", dim_date_rows)
-    dim_priority_parquet = write_parquet_if_available(
-        curated_dir / "dim_priority_latest.parquet", dim_priority_rows
-    )
-    dim_severity_parquet = write_parquet_if_available(
-        curated_dir / "dim_severity_latest.parquet", dim_severity_rows
-    )
-    dim_cwe_parquet = write_parquet_if_available(curated_dir / "dim_cwe_latest.parquet", dim_cwe_rows)
-    fact_parquet = write_parquet_if_available(
-        curated_dir / "fact_vulnerability_risk_latest.parquet", fact_rows
-    )
+        fact_rows, dates = build_fact_rows(
+            vulnerability_rows,
+            product_counts,
+            build_priority_lookup(dim_priority_rows),
+            build_severity_lookup(dim_severity_rows),
+        )
+        dim_date_rows = build_dim_date(dates)
 
-    print(f"Built dim_date rows: {len(dim_date_rows)}")
-    print(f"Built dim_priority rows: {len(dim_priority_rows)}")
-    print(f"Built dim_severity rows: {len(dim_severity_rows)}")
-    print(f"Built dim_cwe rows: {len(dim_cwe_rows)}")
-    print(f"Built fact_vulnerability_risk rows: {len(fact_rows)}")
-    print(f"dim_date CSV: {dim_date_csv}")
-    print(f"dim_priority CSV: {dim_priority_csv}")
-    print(f"dim_severity CSV: {dim_severity_csv}")
-    print(f"dim_cwe CSV: {dim_cwe_csv}")
-    print(f"fact_vulnerability_risk CSV: {fact_csv}")
-    if dim_date_parquet and dim_priority_parquet and dim_severity_parquet and dim_cwe_parquet and fact_parquet:
-        print("Parquet outputs created for star schema tables")
-    else:
-        print("Parquet skipped for one or more star schema tables: pyarrow not installed")
-    return 0
+        write_csv(dim_date_csv, dim_date_rows)
+        write_csv(dim_priority_csv, dim_priority_rows)
+        write_csv(dim_severity_csv, dim_severity_rows)
+        write_csv(dim_cwe_csv, dim_cwe_rows)
+        write_csv(fact_csv, fact_rows)
+
+        dim_date_parquet = write_parquet_if_available(curated_dir / "dim_date_latest.parquet", dim_date_rows)
+        dim_priority_parquet = write_parquet_if_available(
+            curated_dir / "dim_priority_latest.parquet", dim_priority_rows
+        )
+        dim_severity_parquet = write_parquet_if_available(
+            curated_dir / "dim_severity_latest.parquet", dim_severity_rows
+        )
+        dim_cwe_parquet = write_parquet_if_available(curated_dir / "dim_cwe_latest.parquet", dim_cwe_rows)
+        fact_parquet = write_parquet_if_available(
+            curated_dir / "fact_vulnerability_risk_latest.parquet", fact_rows
+        )
+
+        print(f"Built dim_date rows: {len(dim_date_rows)}")
+        print(f"Built dim_priority rows: {len(dim_priority_rows)}")
+        print(f"Built dim_severity rows: {len(dim_severity_rows)}")
+        print(f"Built dim_cwe rows: {len(dim_cwe_rows)}")
+        print(f"Built fact_vulnerability_risk rows: {len(fact_rows)}")
+        print(f"dim_date CSV: {dim_date_csv}")
+        print(f"dim_priority CSV: {dim_priority_csv}")
+        print(f"dim_severity CSV: {dim_severity_csv}")
+        print(f"dim_cwe CSV: {dim_cwe_csv}")
+        print(f"fact_vulnerability_risk CSV: {fact_csv}")
+        if dim_date_parquet and dim_priority_parquet and dim_severity_parquet and dim_cwe_parquet and fact_parquet:
+            print("Parquet outputs created for star schema tables")
+        else:
+            print("Parquet skipped for one or more star schema tables: pyarrow not installed")
+
+        log_lineage_event(
+            data_dir=data_dir,
+            job_name="build_star_schema",
+            layer="curated",
+            code_path=Path(__file__),
+            transform_summary="Build dim_date/dim_priority/dim_severity/dim_cwe and fact_vulnerability_risk.",
+            input_paths=input_paths,
+            output_paths=output_paths,
+            status="success",
+            input_count=len(vulnerability_rows),
+            output_count=len(fact_rows),
+        )
+        return 0
+    except Exception as exc:
+        log_lineage_event(
+            data_dir=data_dir,
+            job_name="build_star_schema",
+            layer="curated",
+            code_path=Path(__file__),
+            transform_summary="Build dim_date/dim_priority/dim_severity/dim_cwe and fact_vulnerability_risk.",
+            input_paths=input_paths,
+            output_paths=output_paths,
+            status="failed",
+            error_message=str(exc),
+        )
+        raise
 
 
 if __name__ == "__main__":

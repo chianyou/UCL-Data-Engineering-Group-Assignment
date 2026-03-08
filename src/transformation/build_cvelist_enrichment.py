@@ -6,12 +6,16 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA_DIR = REPO_ROOT / "data"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
+
+from src.lineage.lineage_logger import log_lineage_event
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,15 +140,24 @@ def extract_container_rows(containers: dict[str, Any], cve_id: str) -> list[dict
     return rows
 
 
-def build_rows(files: list[Path]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def build_rows(
+    files: list[Path],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], int]:
     summary_rows: list[dict[str, Any]] = []
     reference_rows: list[dict[str, Any]] = []
     problem_type_rows: list[dict[str, Any]] = []
     container_rows: list[dict[str, Any]] = []
+    skipped_files = 0
 
     for path in files:
         payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            skipped_files += 1
+            continue
         cve_metadata = payload.get("cveMetadata", {})
+        if not isinstance(cve_metadata, dict) or not cve_metadata.get("cveId"):
+            skipped_files += 1
+            continue
         containers = payload.get("containers", {})
         cve_id = cve_metadata.get("cveId", "")
         cna = containers.get("cna", {})
@@ -175,7 +188,7 @@ def build_rows(files: list[Path]) -> tuple[list[dict[str, Any]], list[dict[str, 
             reference_rows.extend(extract_references(adp, cve_id, container_name))
             problem_type_rows.extend(extract_problem_types(adp, cve_id, container_name))
 
-    return summary_rows, reference_rows, problem_type_rows, container_rows
+    return summary_rows, reference_rows, problem_type_rows, container_rows, skipped_files
 
 
 def main() -> int:
@@ -186,36 +199,77 @@ def main() -> int:
     if not files:
         raise FileNotFoundError("No CVE JSON files found under the cvelistV5 snapshot.")
 
-    summary_rows, reference_rows, problem_type_rows, container_rows = build_rows(files)
-
     curated_dir = data_dir / "curated" / "cve_records"
     curated_dir.mkdir(parents=True, exist_ok=True)
 
-    write_csv(curated_dir / "dim_cve_records_latest.csv", summary_rows)
-    write_csv(curated_dir / "bridge_cve_references_latest.csv", reference_rows)
-    write_csv(curated_dir / "bridge_cve_problem_types_latest.csv", problem_type_rows)
-    write_csv(curated_dir / "fact_cve_containers_latest.csv", container_rows)
+    output_paths = [
+        curated_dir / "dim_cve_records_latest.csv",
+        curated_dir / "bridge_cve_references_latest.csv",
+        curated_dir / "bridge_cve_problem_types_latest.csv",
+        curated_dir / "fact_cve_containers_latest.csv",
+        curated_dir / "dim_cve_records_latest.parquet",
+        curated_dir / "bridge_cve_references_latest.parquet",
+        curated_dir / "bridge_cve_problem_types_latest.parquet",
+        curated_dir / "fact_cve_containers_latest.parquet",
+    ]
 
-    summary_parquet = write_parquet_if_available(curated_dir / "dim_cve_records_latest.parquet", summary_rows)
-    references_parquet = write_parquet_if_available(
-        curated_dir / "bridge_cve_references_latest.parquet", reference_rows
-    )
-    problem_types_parquet = write_parquet_if_available(
-        curated_dir / "bridge_cve_problem_types_latest.parquet", problem_type_rows
-    )
-    containers_parquet = write_parquet_if_available(
-        curated_dir / "fact_cve_containers_latest.parquet", container_rows
-    )
+    try:
+        summary_rows, reference_rows, problem_type_rows, container_rows, skipped_files = build_rows(files)
 
-    print(f"Built CVE record summary rows: {len(summary_rows)}")
-    print(f"Built CVE reference rows: {len(reference_rows)}")
-    print(f"Built CVE problem type rows: {len(problem_type_rows)}")
-    print(f"Built CVE container rows: {len(container_rows)}")
-    if summary_parquet and references_parquet and problem_types_parquet and containers_parquet:
-        print("Parquet outputs created for all cvelistV5 enrichment tables")
-    else:
-        print("Parquet skipped for some or all cvelistV5 enrichment tables: pyarrow not installed")
-    return 0
+        write_csv(curated_dir / "dim_cve_records_latest.csv", summary_rows)
+        write_csv(curated_dir / "bridge_cve_references_latest.csv", reference_rows)
+        write_csv(curated_dir / "bridge_cve_problem_types_latest.csv", problem_type_rows)
+        write_csv(curated_dir / "fact_cve_containers_latest.csv", container_rows)
+
+        summary_parquet = write_parquet_if_available(
+            curated_dir / "dim_cve_records_latest.parquet", summary_rows
+        )
+        references_parquet = write_parquet_if_available(
+            curated_dir / "bridge_cve_references_latest.parquet", reference_rows
+        )
+        problem_types_parquet = write_parquet_if_available(
+            curated_dir / "bridge_cve_problem_types_latest.parquet", problem_type_rows
+        )
+        containers_parquet = write_parquet_if_available(
+            curated_dir / "fact_cve_containers_latest.parquet", container_rows
+        )
+
+        print(f"Built CVE record summary rows: {len(summary_rows)}")
+        print(f"Built CVE reference rows: {len(reference_rows)}")
+        print(f"Built CVE problem type rows: {len(problem_type_rows)}")
+        print(f"Built CVE container rows: {len(container_rows)}")
+        print(f"Skipped non-CVE JSON files: {skipped_files}")
+        if summary_parquet and references_parquet and problem_types_parquet and containers_parquet:
+            print("Parquet outputs created for all cvelistV5 enrichment tables")
+        else:
+            print("Parquet skipped for some or all cvelistV5 enrichment tables: pyarrow not installed")
+
+        log_lineage_event(
+            data_dir=data_dir,
+            job_name="build_cvelist_enrichment",
+            layer="curated",
+            code_path=Path(__file__),
+            transform_summary="Extract dim/bridge enrichment tables from cvelistV5 containers.",
+            input_paths=files,
+            output_paths=output_paths,
+            status="success",
+            input_count=len(files),
+            output_count=len(summary_rows),
+        )
+        return 0
+    except Exception as exc:
+        log_lineage_event(
+            data_dir=data_dir,
+            job_name="build_cvelist_enrichment",
+            layer="curated",
+            code_path=Path(__file__),
+            transform_summary="Extract dim/bridge enrichment tables from cvelistV5 containers.",
+            input_paths=files,
+            output_paths=output_paths,
+            status="failed",
+            error_message=str(exc),
+        )
+        raise
 
 
 if __name__ == "__main__":

@@ -167,6 +167,9 @@ Recommended Render environment variables:
 Notes:
 - On free plans, filesystem persistence is limited; DuckDB may be rebuilt on restart.
 - Startup auto-load uses `src/analytics/duckdb/load_duckdb.py` when DB file is missing.
+- On Render free instances, the API may spin down after ~15 minutes of inactivity.
+- First request after inactivity may take up to ~60 seconds (cold start).
+- For demos, pre-warm the API by opening `/health` before loading the dashboard.
 
 ## Deployment Architecture (Current)
 
