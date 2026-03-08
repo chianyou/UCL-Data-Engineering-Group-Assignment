@@ -188,6 +188,24 @@ Current setup example:
 
 - `https://chianyou.github.io/UCL-Data-Engineering-Group-Assignment/dashboard/?api_base=https://cyber-risk-api.onrender.com`
 
+## Data Lineage
+
+Job-level lineage tracking is enabled for key transformation and analytics scripts.
+
+Lineage outputs:
+- `data/curated/lineage/lineage_events_latest.csv`
+- `data/curated/lineage/lineage_events_latest.jsonl`
+
+Tracked jobs:
+- `build_vulnerability_mart`
+- `build_cve_product_bridge`
+- `build_cvelist_enrichment`
+- `build_star_schema`
+- `build_transformation_summaries`
+- `load_duckdb_tables`
+
+Detailed field definitions and query examples:
+- `docs/lineage.md`
 
 ## Notes
 
