@@ -185,13 +185,6 @@ Current setup example:
 
 - `https://chianyou.github.io/UCL-Data-Engineering-Group-Assignment/dashboard/?api_base=https://cyber-risk-api.onrender.com`
 
-## Current Progress
-
-- Step 1 (Data Integration Owner): completed
-- Step 2 (Storage / Database Owner): completed
-- Step 3 (Transformation / PySpark Owner): completed (Spark from MongoDB plus curated outputs)
-- Step 4 (Analytics / Query Owner): completed (DuckDB query pack + FastAPI + dashboard API mode)
-- Step 5 (Engineering / Documentation Owner): in progress
 
 ## Notes
 
