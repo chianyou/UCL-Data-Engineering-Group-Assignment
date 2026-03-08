@@ -1,0 +1,6 @@
+severity_key,cvss_severity,severity_rank
+1,LOW,1
+2,MEDIUM,2
+3,HIGH,3
+4,CRITICAL,4
+5,UNKNOWN,0

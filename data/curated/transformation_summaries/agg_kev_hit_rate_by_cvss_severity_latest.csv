@@ -1,0 +1,7 @@
+cvss_severity,total_cves,kev_cves,kev_hit_rate
+CRITICAL,459,8,0.017429
+HIGH,1583,10,0.006317
+LOW,211,0,0.0
+MEDIUM,2099,2,0.000953
+NONE,7,0,0.0
+UNKNOWN,774,0,0.0
