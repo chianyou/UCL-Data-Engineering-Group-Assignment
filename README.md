@@ -165,6 +165,23 @@ Notes:
 - On free plans, filesystem persistence is limited; DuckDB may be rebuilt on restart.
 - Startup auto-load uses `src/analytics/duckdb/load_duckdb.py` when DB file is missing.
 
+## Deployment Architecture (Current)
+
+The project is deployed as:
+
+- Frontend dashboard on GitHub Pages
+- Backend API (FastAPI + DuckDB) on Render
+
+The frontend calls the Render API via the `api_base` query parameter.
+
+Example production URL pattern:
+
+- `https://<github-user>.github.io/<repo-name>/dashboard/?api_base=https://<render-service>.onrender.com`
+
+Current setup example:
+
+- `https://chianyou.github.io/UCL-Data-Engineering-Group-Assignment/dashboard/?api_base=https://cyber-risk-api.onrender.com`
+
 ## Current Progress
 
 - Step 1 (Data Integration Owner): completed
