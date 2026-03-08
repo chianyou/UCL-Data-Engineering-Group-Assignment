@@ -1,0 +1,9 @@
+run_id,run_ts_utc,job_name,layer,status,transform_summary,input_count,output_count,error_message
+a08be91e76d04705aac838896d98b2d6,2026-03-08T18:30:46.119945+00:00,build_vulnerability_mart,curated,success,Join NVD + CISA KEV + EPSS into vulnerability_priority mart.,5133,5133,
+b3088663b3cf4b01ae41ed4613b382c6,2026-03-08T18:30:46.522366+00:00,build_cve_product_bridge,curated,success,Extract product dimension and CVE-product bridge from NVD configurations.,5133,11796,
+2f8dcdef13ce44898f9f1825a146e1af,2026-03-08T18:30:46.848814+00:00,build_star_schema,curated,success,Build dim_date/dim_priority/dim_severity/dim_cwe and fact_vulnerability_risk.,5133,5133,
+942055ed80cf413cbb106c5c4b35be53,2026-03-08T18:30:47.126721+00:00,build_transformation_summaries,curated,success,"Build analytics summary aggregates for trend, severity, KEV, EPSS, and CWE views.",5133,5256,
+d835797fcea14aaf995982962dc2ce41,2026-03-08T18:30:47.474946+00:00,load_duckdb_tables,analytics,success,Load curated parquet datasets into DuckDB analytics tables.,13,30517,
+49f56e47ac1142c4890bee6275f8f984,2026-03-08T18:34:01.489479+00:00,build_cvelist_enrichment,curated,failed,Extract dim/bridge enrichment tables from cvelistV5 containers.,,,'list' object has no attribute 'get'
+59dbfaa88cc4496695afee06c1bf8413,2026-03-08T18:37:06.604216+00:00,build_cvelist_enrichment,curated,success,Extract dim/bridge enrichment tables from cvelistV5 containers.,336666,336664,
+3f78222b8d5e48ee9fbe069aa0ead06b,2026-03-08T18:37:16.964706+00:00,load_duckdb_tables,analytics,success,Load curated parquet datasets into DuckDB analytics tables.,13,30517,

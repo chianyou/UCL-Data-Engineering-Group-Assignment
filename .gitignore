@@ -18,3 +18,9 @@ data/processed/
 # Large lineage logs
 /data/curated/lineage/lineage_events_latest.csv
 /data/curated/lineage/lineage_events_latest.jsonl
+<<<<<<< HEAD
+=======
+
+/data/curated/lineage/lineage_events_latest.csv
+/data/curated/lineage/lineage_events_latest.jsonl
+>>>>>>> 9e290d2 (data: include curated summaries, lineage logs, and star-schema CSV snapshots)
