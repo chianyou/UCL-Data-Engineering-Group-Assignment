@@ -17,6 +17,7 @@ This repository implements a cyber-risk data engineering pipeline using NVD, CIS
 
 ```text
 .
+|-- airflow
 |-- data
 |   |-- raw
 |   |-- staging
@@ -55,6 +56,8 @@ This repository implements a cyber-risk data engineering pipeline using NVD, CIS
 - Analytics/API
   - DuckDB loader: `src/analytics/duckdb/load_duckdb.py`
   - FastAPI service: `src/api/fastapi_duckdb.py`
+- Orchestration
+  - Airflow DAG: `airflow/dags/cyber_risk_pipeline.py`
 
 ## Run Pipeline
 
@@ -195,3 +198,4 @@ Current setup example:
 - If `duckdb` CLI is unavailable, use Python scripts for loading/querying.
 - If DuckDB lock conflicts appear, close the process holding `data/analytics.duckdb`.
 - In JupyterHub, use proxy URLs instead of localhost ports.
+- Airflow orchestration example is provided under `airflow/`.
